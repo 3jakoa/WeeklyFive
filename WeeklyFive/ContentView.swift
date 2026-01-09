@@ -80,6 +80,9 @@ struct ContentView: View {
     // Kontrolira prikaz "Add" ekrana
     @State private var isShowingAdd = false
 
+    // Info / About sheet
+    @State private var isShowingInfo = false
+
     // Kratek "celebration" overlay, ko uporabnik dokonča vseh 5
     @State private var showCompletionOverlay = false
 
@@ -228,7 +231,8 @@ struct ContentView: View {
                                 }
                             }
                             .onDelete { indexSet in
-                                items.remove(atOffsets: indexSet)
+                                let idsToDelete = indexSet.map { items[$0].id }
+                                items.removeAll { idsToDelete.contains($0.id) }
                             }
                         } header: {
                             HStack {
@@ -286,7 +290,13 @@ struct ContentView: View {
             }
             .navigationTitle("Weekly Five")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        isShowingInfo = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                    }
+
                     Button {
                         isShowingAdd = true
                     } label: {
@@ -299,6 +309,9 @@ struct ContentView: View {
                 AddItemView { newTitle in
                     items.append(PriorityItem(title: newTitle))
                 }
+            }
+            .sheet(isPresented: $isShowingInfo) {
+                AboutView()
             }
             .task {
                 // Load persisted items first.
@@ -322,6 +335,42 @@ struct ContentView: View {
             }
             .onChange(of: items) { _, _ in
                 saveItems()
+            }
+        }
+    }
+}
+
+struct AboutView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Weekly Five")
+                        .font(.title2.weight(.semibold))
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Pick up to 5 priorities for the week.", systemImage: "hand.raised")
+                        Label("Choose wisely and get it done.", systemImage: "sparkles")
+                        Label("Everything resets on Monday — start clean.", systemImage: "arrow.clockwise")
+                    }
+
+                    Divider()
+
+                    Text("The point")
+                        .font(.headline)
+
+                    Text("This app is for people who want clarity, not a second job managing tasks. If it’s not one of your five, it can wait.")
+                        .foregroundStyle(.secondary)
+                }
+                .padding(20)
+            }
+            .navigationTitle("About")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
             }
         }
     }
