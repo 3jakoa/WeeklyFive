@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UserNotifications
+import UIKit
 
 enum NotificationManager {
     static let weeklyReminderId = "weekly_five_monday_reminder"
@@ -74,7 +75,7 @@ struct PriorityItem: Identifiable, Hashable, Codable {
 
 struct ContentView: View {
 
-    // Lokalni state – seznam prioritet (za zdaj samo v RAM-u)
+    // Lokalni state – seznam prioritet
     @State private var items: [PriorityItem] = []
 
     // Kontrolira prikaz "Add" ekrana
@@ -197,7 +198,36 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
+            List {
+                Section {
+                    ForEach(items) { item in
+                        Button {
+                            toggleDone(for: item)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
+                                Text(item.title)
+                                    .strikethrough(item.isDone)
+                            }
+                            .foregroundStyle(item.isDone ? .secondary : .primary)
+                            .contentShape(Rectangle())
+                        }
+                    }
+                    .onDelete { indexSet in
+                        let idsToDelete = indexSet.map { items[$0].id }
+                        items.removeAll { idsToDelete.contains($0.id) }
+                    }
+                } header: {
+                    HStack {
+                        Text("This Week")
+                        Spacer()
+                        Text("\(items.count)/5")
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                    }
+                }
+            }
+            .overlay {
                 if items.isEmpty {
                     VStack(spacing: 16) {
                         Spacer(minLength: 0)
@@ -214,36 +244,7 @@ struct ContentView: View {
 
                         Spacer(minLength: 0)
                     }
-                } else {
-                    List {
-                        Section {
-                            ForEach(items) { item in
-                                Button {
-                                    toggleDone(for: item)
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
-                                        Text(item.title)
-                                            .strikethrough(item.isDone)
-                                    }
-                                    .foregroundStyle(item.isDone ? .secondary : .primary)
-                                    .contentShape(Rectangle())
-                                }
-                            }
-                            .onDelete { indexSet in
-                                let idsToDelete = indexSet.map { items[$0].id }
-                                items.removeAll { idsToDelete.contains($0.id) }
-                            }
-                        } header: {
-                            HStack {
-                                Text("This Week")
-                                Spacer()
-                                Text("\(items.count)/5")
-                                    .foregroundStyle(.secondary)
-                                    .font(.subheadline)
-                            }
-                        }
-                    }
+                    .allowsHitTesting(false)
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -307,7 +308,16 @@ struct ContentView: View {
             }
             .sheet(isPresented: $isShowingAdd) {
                 AddItemView { newTitle in
-                    items.append(PriorityItem(title: newTitle))
+                    // Avoid double-animation (sheet dismiss + view-tree change) on first add.
+                    if items.isEmpty {
+                        var t = Transaction()
+                        t.animation = nil
+                        withTransaction(t) {
+                            items.append(PriorityItem(title: newTitle))
+                        }
+                    } else {
+                        items.append(PriorityItem(title: newTitle))
+                    }
                 }
             }
             .sheet(isPresented: $isShowingInfo) {
@@ -336,6 +346,7 @@ struct ContentView: View {
             .onChange(of: items) { _, _ in
                 saveItems()
             }
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
         }
     }
 }
@@ -355,6 +366,7 @@ struct AboutView: View {
                         Label("Choose wisely and get it done.", systemImage: "sparkles")
                         Label("Everything resets on Monday — start clean.", systemImage: "arrow.clockwise")
                     }
+                    .font(.body)
 
                     Divider()
 
@@ -364,9 +376,13 @@ struct AboutView: View {
                     Text("This app is for people who want clarity, not a second job managing tasks. If it’s not one of your five, it can wait.")
                         .foregroundStyle(.secondary)
                 }
-                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
             .navigationTitle("About")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
@@ -414,6 +430,7 @@ struct AddItemView: View {
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
         }
     }
 }
